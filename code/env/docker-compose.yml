@@ -1,5 +1,5 @@
 version: '3.3'
-#该脚本是在49.52.27.112上已创建有master节点的情况下，在其他服务器上创建worker节点
+#该脚本用于在49.52.27.112上已创建有master节点的情况下，在其他服务器上创建worker节点
 services:
   spark-worker-b1:
     image: apache/spark:3.5.7-python3
