@@ -1,0 +1,3 @@
+name,n_keys,min_count,max_count,mean,std,cv,max_mean_ratio,norm_entropy
+balanced,20,500,500,500.0,0.0,0.0,1.0,0.9999999999933238
+skewed,20,67,8500,500.0,1835.349094859068,3.6706981897181357,17.0,0.2881839319243841
