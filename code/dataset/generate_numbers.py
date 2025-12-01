@@ -5,10 +5,10 @@
 
 用法:
 生成不均匀数据（90%为同一个值）
-    python generate_numbers.py --num 100000000 --output inbalance.txt --repeat-ratio 0.9
+    python generate_numbers.py --num 10000000 --output inbalance.txt --repeat-ratio 0.9
 
 生成均匀数据（完全随机）
-    python generate_numbers.py --num 100000000 --output balance.txt --repeat-ratio 0.0
+    python generate_numbers.py --num 10000000 --output balance.txt --repeat-ratio 0.0
 """
 
 import argparse

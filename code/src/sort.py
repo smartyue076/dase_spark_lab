@@ -2,7 +2,7 @@
 """
 使用纯 RDD 对本地整数文件排序，支持选择分区器：
 - range: 全局排序（使用 RangePartitioner）
-- hash: 哈希分区 + 分区内排序（使用 HashPartitioner）
+- hash: 哈希分区 + 分区内排序，但最终输出全局有序
 
 输入：每行一个整数的文本文件  
 输出：排序后的整数（每行一个），写入单个 part-00000 文件
@@ -24,6 +24,7 @@ import argparse
 import sys
 from datetime import datetime
 from pyspark import SparkContext, SparkConf
+from pyspark.rdd import portable_hash
 
 
 def parse_int(s):
@@ -66,10 +67,11 @@ def main():
     # 配置 Spark
     current_time_str = datetime.now().strftime("%m%d%H%M")
     conf = SparkConf().setAppName(f"RDD-Sort-{partitioner_type}-{current_time_str}")
-    # 启用事件日志（兼容你的 History Server）
     conf.set("spark.eventLog.enabled", "true")
     conf.set("spark.eventLog.dir", "file:///tmp/spark-events")
-    conf.set("spark.sql.shuffle.partitions", str(num_partitions))  # 虽然不用 SQL，但影响 shuffle 默认值
+    conf.set("spark.sql.shuffle.partitions", str(num_partitions))
+
+    output_path = f"{output_path}-{current_time_str}"
 
     sc = SparkContext(conf=conf)
     sc.setLogLevel("WARN")
@@ -89,25 +91,27 @@ def main():
             sorted_rdd = numbers.sortBy(lambda x: x, ascending=True, numPartitions=num_partitions)
 
         elif partitioner_type == "hash":
-            # === 哈希分区 + 分区内排序 ===
-            print("🔀 执行哈希分区 + 分区内排序（HashPartitioner）...")
+            # === 哈希分区 + 分区内排序，但最终输出全局有序 ===
+            print("🔀 执行哈希分区 + 分区内排序（HashPartitioner），再全局排序...")
 
-            # 转为 (key, value) 形式以便 partitionBy
+            # 1. 转为 (key, value) 形式以便 partitionBy
             keyed_rdd = numbers.map(lambda x: (x, x))
 
-            # 使用 HashPartitioner 重分区
-            repartitioned = keyed_rdd.partitionBy(num_partitions)
+            # 2. 使用 HashPartitioner 重分区
+            repartitioned = keyed_rdd.partitionBy(num_partitions, partitionFunc=portable_hash)
 
-            # 提取 value 并在每个分区内排序
-            values_only = repartitioned.map(lambda kv: kv[1])
-            sorted_rdd = values_only.mapPartitions(sort_partition)
+            # 3. 分区内排序
+            locally_sorted = repartitioned.map(lambda kv: kv[1]).mapPartitions(sort_partition)
+
+            # 4. 全局排序（保留分区数量，但保证全局有序）
+            #    注意：如果数据量很大，可能会触发 shuffle
+            sorted_rdd = locally_sorted.sortBy(lambda x: x, ascending=True, numPartitions=num_partitions)
 
         else:
             raise ValueError(f"未知分区器: {partitioner_type}")
 
         # 3. 写入结果（强制合并为单个文件）
         print("⏳ 写入结果...")
-        output_path = f"{output_path}-{current_time_str}"
         sorted_rdd.coalesce(1).saveAsTextFile(output_path)
 
         print(f"✅ 完成！结果: {output_path}/part-00000")
