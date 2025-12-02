@@ -31,10 +31,20 @@ def generate_zipf_sequence(n, s, output_file, max_value=1000000, plot=False):
         seq = random.choices(keys, weights=probs, k=n)
 
     # 写入文件
+    # with open(output_file, "w") as f:
+    #     for number in seq:
+    #         f.write(f"{number}\n")
+    # print(f"Generated sequence with n={n}, s={s}, saved to {output_file}")
+
+
+    # use char pedding to format size
+    width = len(str(max_value))
+
     with open(output_file, "w") as f:
         for number in seq:
-            f.write(f"{number}\n")
-    print(f"Generated sequence with n={n}, s={s}, saved to {output_file}")
+            f.write(f"{number:0{width}d}\n")
+
+    print(f"Generated sequence n={n}, s={s}, max_value={max_value}, saved to {output_file}")
 
     # # 绘制分布图
     # if plot:

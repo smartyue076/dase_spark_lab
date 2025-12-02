@@ -15,7 +15,7 @@
   --conf spark.eventLog.enabled=true \
   --conf spark.eventLog.dir=file:///tmp/spark-events \
   /opt/spark/work-dir/code/src/sort.py \
-  --input /opt/spark/work-dir/code/dataset/inbalance.txt \
+  --input /opt/spark/work-dir/code/dataset/minimal_skew.txt \
   --output /opt/spark/work-dir/code/dataset/sorted_numbers \
   --partitioner hash
 """
@@ -27,11 +27,16 @@ from pyspark import SparkContext, SparkConf
 from pyspark.rdd import portable_hash
 
 
-def parse_int(s):
-    try:
-        return int(s.strip())
-    except Exception:
-        return None
+# def parse_int(s):
+#     try:
+#         return int(s.strip())
+#     except Exception:
+#         return None
+
+def parse_key(s):
+    """保留零填充字符串，排序使用字符串字典序。"""
+    v = s.strip()
+    return v if v else None
 
 
 def sort_partition(iterator):
@@ -83,7 +88,7 @@ def main():
     try:
         # 1. 读取文本并转为整数 RDD，过滤无效行
         lines = sc.textFile(input_path)
-        numbers = lines.map(parse_int).filter(lambda x: x is not None)
+        numbers = lines.map(parse_key).filter(lambda x: x is not None)
 
         if partitioner_type == "range":
             # === 全局排序：使用 sortBy() → 自动用 RangePartitioner ===

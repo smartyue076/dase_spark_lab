@@ -1,0 +1,91 @@
+version: '3.3'
+
+services:
+  spark-master-b:
+    image: apache/spark:3.5.7-python3
+    container_name: spark-master-b
+    user: root
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=172.23.166.104
+      - SPARK_LOCAL_IP=172.23.166.104
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=file:///tmp/spark-events
+    command: >
+      bash -c "
+      mkdir -p /tmp/spark-events &&
+      /opt/spark/sbin/start-master.sh -h 172.23.166.104 -p 7077 --webui-port 8080 &&
+      tail -f /opt/spark/logs/spark--org.apache.spark.deploy.master.Master-*.out"
+    network_mode: "host"
+    volumes:
+      - /home/xuyue/shared_spark_test:/opt/spark/work-dir:rw
+      - /home/xuyue/shared_spark_test/spark-events:/tmp/spark-events:rw
+    restart: unless-stopped
+
+  spark-worker-b1:
+    image: apache/spark:3.5.7-python3
+    container_name: spark-worker-b1
+    user: root
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://172.23.166.104:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7339 -Dspark.local.dir=/tmp/spark-shuffle
+      - SPARK_WORKER_WEBUI_PORT=8083
+      - SPARK_WORKER_PORT=7083
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - /home/xuyue/shared_spark_test:/opt/spark/work-dir:rw
+      - /home/xuyue/shared_spark_test/spark-shuffle:/tmp/spark-shuffle:rw
+    network_mode: host
+    command: >
+      bash -c "
+      /opt/spark/sbin/start-worker.sh spark://172.23.166.104:7077 --webui-port 8083 --port 7083 && tail -f /opt/spark/logs/spark--org.apache.spark.deploy.worker.Worker-*.out"
+    restart: unless-stopped
+
+  spark-worker-b2:
+    image: apache/spark:3.5.7-python3
+    container_name: spark-worker-b2
+    user: root
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://172.23.166.104:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7340 -Dspark.local.dir=/tmp/spark-shuffle
+      - SPARK_WORKER_WEBUI_PORT=8089
+      - SPARK_WORKER_PORT=7089
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - /home/xuyue/shared_spark_test:/opt/spark/work-dir:rw
+      - /home/xuyue/shared_spark_test/spark-shuffle:/tmp/spark-shuffle:rw
+    network_mode: host
+    command: >
+      bash -c "
+      /opt/spark/sbin/start-worker.sh spark://172.23.166.104:7077 --webui-port 8089 --port 7089 && tail -f /opt/spark/logs/spark--org.apache.spark.deploy.worker.Worker-*.out"
+    restart: unless-stopped
+
+  spark-history-server-b:
+    image: apache/spark:3.5.7-python3
+    container_name: spark-history-server-b
+    user: root
+    environment:
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=file:///tmp/spark-events -Dspark.history.ui.port=18080
+    command: >
+      bash -c "
+      /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer"
+    network_mode: "host"
+    volumes:
+      - /home/xuyue/shared_spark_test/spark-events:/tmp/spark-events:rw
+    restart: unless-stopped
