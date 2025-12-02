@@ -1,0 +1,50 @@
+version: '3.3'
+
+services:
+  spark-worker-b3:
+    image: apache/spark:3.5.7-python3
+    container_name: spark-worker-b3
+    user: root
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://172.23.166.104:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7339 -Dspark.local.dir=/tmp/spark-shuffle
+      - SPARK_WORKER_WEBUI_PORT=8084
+      - SPARK_WORKER_PORT=7084
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - /data/wuyingjie/shared_spark_test:/opt/spark/work-dir:rw
+      - /data/wuyingjie/shared_spark_test/spark-shuffle:/tmp/spark-shuffle:rw
+    network_mode: host
+    command: >
+      bash -c "
+      /opt/spark/sbin/start-worker.sh spark://172.23.166.104:7077 --webui-port 8084 --port 7084 && tail -f /opt/spark/logs/spark--org.apache.spark.deploy.worker.Worker-*.out"
+    restart: unless-stopped
+
+  spark-worker-b4:
+    image: apache/spark:3.5.7-python3
+    container_name: spark-worker-b4
+    user: root
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://172.23.166.104:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_OPTS=-Dspark.shuffle.service.enabled=true -Dspark.shuffle.service.port=7340 -Dspark.local.dir=/tmp/spark-shuffle
+      - SPARK_WORKER_WEBUI_PORT=8086
+      - SPARK_WORKER_PORT=7086
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - /data/wuyingjie/shared_spark_test:/opt/spark/work-dir:rw
+      - /data/wuyingjie/shared_spark_test/spark-shuffle:/tmp/spark-shuffle:rw
+    network_mode: host
+    command: >
+      bash -c "
+      /opt/spark/sbin/start-worker.sh spark://172.23.166.104:7077 --webui-port 8086 --port 7086 && tail -f /opt/spark/logs/spark--org.apache.spark.deploy.worker.Worker-*.out"
+    restart: unless-stopped
