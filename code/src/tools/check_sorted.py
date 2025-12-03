@@ -29,7 +29,7 @@ def is_sorted(file_path):
                 return False
 
             prev = num
-
+        print("line_num: ",line_num)
     return True
 
 
