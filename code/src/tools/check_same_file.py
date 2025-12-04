@@ -10,5 +10,5 @@ def file_md5(path):
 def files_equal_md5(file1, file2):
     return file_md5(file1) == file_md5(file2)
 
-print(files_equal_md5("/home/xuyue/shared_spark_test/xy/dase_spark_lab/code/dataset/test1.txt", 
-                      "/home/xuyue/test1.txt"))
+print(files_equal_md5("/home/xuyue/shared_spark_test/xy/dase_spark_lab/code/dataset/heavy_skew.txt", 
+                      "/home/xuyue/shared_spark_test/xy/dase_spark_lab/code/dataset/heavy_skew2.txt"))

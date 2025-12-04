@@ -14,52 +14,42 @@
   --executor-cores 1 \
   --conf spark.eventLog.enabled=true \
   --conf spark.eventLog.dir=file:///tmp/spark-events \
-  /opt/spark/work-dir/code/src/sort.py \
-  --input /opt/spark/work-dir/code/dataset/minimal_skew.txt \
-  --output /opt/spark/work-dir/code/dataset/sorted_numbers \
-  --partitioner hash
+  /opt/spark/work-dir/xy/dase_spark_lab/code/src/sort.py \
+  --input /opt/spark/work-dir/xy/dase_spark_lab/code/dataset/heavy_skew.txt \
+  --output /opt/spark/work-dir/xy/dase_spark_lab/code/dataset/sorted_numbers \
+  --partitioner range
 """
 
 import argparse
 import sys
+import os
 from datetime import datetime
 from pyspark import SparkContext, SparkConf
 from pyspark.rdd import portable_hash
 
-
-# def parse_int(s):
-#     try:
-#         return int(s.strip())
-#     except Exception:
-#         return None
-
 def parse_key(s):
-    """保留零填充字符串，排序使用字符串字典序。"""
     v = s.strip()
     return v if v else None
 
-
 def sort_partition(iterator):
-    """对单个分区内的数据排序"""
     data = list(iterator)
     data.sort()
     return iter(data)
 
-
 def main():
-    parser = argparse.ArgumentParser(description="RDD 排序：支持 hash 或 range 分区器")
+    parser = argparse.ArgumentParser(description="RDD 排序并导出每分区数据")
     parser.add_argument("--input", required=True, help="输入文件路径（每行一个整数）")
     parser.add_argument("--output", required=True, help="输出目录路径")
     parser.add_argument(
         "--partitioner",
         choices=["range", "hash"],
         default="range",
-        help="分区策略: 'range'（全局排序）或 'hash'（分区内排序）"
+        help="分区策略: range 或 hash"
     )
     parser.add_argument(
         "--num-partitions",
         type=int,
-        default=8,
+        default=4,
         help="分区数量"
     )
     args = parser.parse_args()
@@ -71,62 +61,62 @@ def main():
 
     # 配置 Spark
     current_time_str = datetime.now().strftime("%m%d%H%M")
-    conf = SparkConf().setAppName(f"RDD-Sort-{partitioner_type}-{current_time_str}")
+    filename_with_ext = os.path.basename(input_path)
+    filename = os.path.splitext(filename_with_ext)[0]
+    conf = SparkConf().setAppName(f"A-Sort-{partitioner_type}-{filename}-{current_time_str}")
     conf.set("spark.eventLog.enabled", "true")
     conf.set("spark.eventLog.dir", "file:///tmp/spark-events")
     conf.set("spark.sql.shuffle.partitions", str(num_partitions))
 
     output_path = f"{output_path}-{current_time_str}"
+    partition_dump_path = f"{output_path}-partitions"
 
     sc = SparkContext(conf=conf)
     sc.setLogLevel("WARN")
 
     print(f"📂 输入: {input_path}")
     print(f"💾 输出: {output_path}")
-    print(f"🧩 分区器: {partitioner_type} (partitions={num_partitions})")
+    print(f"📁 分区数据 dump: {partition_dump_path}")
+    print(f"🧩 分区器: {partitioner_type} (numPartitions={num_partitions})")
 
     try:
-        # 1. 读取文本并转为整数 RDD，过滤无效行
+        # 1. 加载数据
         lines = sc.textFile(input_path)
         numbers = lines.map(parse_key).filter(lambda x: x is not None)
 
         if partitioner_type == "range":
-            # === 全局排序：使用 sortBy() → 自动用 RangePartitioner ===
             print("🔄 执行全局排序（RangePartitioner）...")
             sorted_rdd = numbers.sortBy(lambda x: x, ascending=True, numPartitions=num_partitions)
 
         elif partitioner_type == "hash":
-            # === 哈希分区 + 分区内排序，但最终输出全局有序 ===
-            print("🔀 执行哈希分区 + 分区内排序（HashPartitioner），再全局排序...")
-
-            # 1. 转为 (key, value) 形式以便 partitionBy
+            print("🔀 执行哈希分区 + 分区内排序 + 全局排序...")
             keyed_rdd = numbers.map(lambda x: (x, x))
-
-            # 2. 使用 HashPartitioner 重分区
             repartitioned = keyed_rdd.partitionBy(num_partitions, partitionFunc=portable_hash)
-
-            # 3. 分区内排序
             locally_sorted = repartitioned.map(lambda kv: kv[1]).mapPartitions(sort_partition)
-
-            # 4. 全局排序（保留分区数量，但保证全局有序）
-            #    注意：如果数据量很大，可能会触发 shuffle
             sorted_rdd = locally_sorted.sortBy(lambda x: x, ascending=True, numPartitions=num_partitions)
 
         else:
-            raise ValueError(f"未知分区器: {partitioner_type}")
+            raise ValueError(f"未知分区器类型: {partitioner_type}")
 
-        # 3. 写入结果（强制合并为单个文件）
-        print("⏳ 写入结果...")
+        # # 2. 保存每分区的数据（关键部分！）
+        # print("📝 保存每个分区的数据...")
+        # partition_dump_rdd = sorted_rdd.mapPartitionsWithIndex(
+        #     lambda it: (f"{v}" for v in it)
+        # )
+        # partition_dump_rdd.saveAsTextFile(partition_dump_path)
+
+        # 3. 保存最终排序结果
+        print("⏳ 写入最终排序输出...")
         sorted_rdd.coalesce(1).saveAsTextFile(output_path)
 
-        print(f"✅ 完成！结果: {output_path}/part-00000")
+        print(f"✅ 完成！结果：{output_path}/part-00000")
+        # print(f"📁 分区 dump：{partition_dump_path}")
 
     except Exception as e:
         print(f"❌ 错误: {e}", file=sys.stderr)
         raise
     finally:
         sc.stop()
-
 
 if __name__ == "__main__":
     main()
