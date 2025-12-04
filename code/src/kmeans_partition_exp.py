@@ -2,8 +2,8 @@
 
 import argparse
 from pyspark.sql import SparkSession
-from pyspark.ml.linalg import Vectors
-from pyspark.ml.clustering import KMeans
+from pyspark.mllib.linalg import Vectors
+from pyspark.mllib.clustering import KMeans
 
 
 def parse_args():
@@ -29,38 +29,55 @@ def main():
         .getOrCreate()
     )
 
-    # Read raw text data
-    df = spark.read.text(args.input)
+    sc = spark.sparkContext
 
-    # Data format example:
-    # 12 4.095992 4.950638 -4.377580 3.632250 1.103754
-    # First column is an integer key, others are float features
-    df = df.rdd.map(lambda r: r[0].split()).map(
-        lambda arr: (int(arr[0]), Vectors.dense([float(x) for x in arr[1:]]))
-    ).toDF(["key", "features"])
+    # =====================================================
+    # 1. Load & parse dataset (RDD-based, no numpy required)
+    # =====================================================
+    raw_rdd = sc.textFile(args.input)
 
-    # Partitioning strategy
+    # Each line example:
+    #   12 4.095992 4.950638 -4.377580 3.632250 1.103754
+    #
+    # We convert to:
+    #   key(int), vector(features)
+    parsed_rdd = raw_rdd.map(lambda line: line.split()) \
+        .map(lambda arr: (int(arr[0]), Vectors.dense([float(x) for x in arr[1:]])))
+
+    # =====================================================
+    # 2. Apply partitioning strategy
+    # =====================================================
     if args.strategy == "hash":
-        df = df.repartition(args.num_partitions, "key")
+        # Hash partition on key
+        partitioned_rdd = parsed_rdd.partitionBy(args.num_partitions, lambda k: hash(k))
     elif args.strategy == "range":
-        df = df.sortWithinPartitions("key").repartitionByRange(args.num_partitions, "key")
+        # Range partition based on key
+        partitioned_rdd = parsed_rdd.sortBy(lambda x: x[0], ascending=True,
+                                            numPartitions=args.num_partitions)
+    else:
+        raise ValueError("Invalid partition strategy.")
 
-    # KMeans training
-    kmeans = (
-        KMeans()
-        .setK(args.k)
-        .setSeed(args.seed)
-        .setMaxIter(args.max_iter)
-        .setFeaturesCol("features")
+    # Only vectors are needed for KMeans.train
+    vector_rdd = partitioned_rdd.map(lambda kv: kv[1]).cache()
+
+    # =====================================================
+    # 3. Train KMeans (MLLIB version, no numpy needed)
+    # =====================================================
+    model = KMeans.train(
+        vector_rdd,
+        k=args.k,
+        maxIterations=args.max_iter,
+        seed=args.seed
     )
 
-    model = kmeans.fit(df)
-
-    print("=== KMeans Result ===")
+    # =====================================================
+    # 4. Output results
+    # =====================================================
+    print("=== KMeans Result (MLLIB version, no numpy) ===")
     print("Cluster Centers:")
-    for c in model.clusterCenters():
+    for c in model.clusterCenters:
         print(c)
-    print("=====================")
+    print("==============================================")
 
     spark.stop()
 
