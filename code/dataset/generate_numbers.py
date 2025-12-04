@@ -4,13 +4,14 @@ import random
 import argparse
 '''
 usage:
-python generate_numbers.py --n 100000000 --s 0 --output_file minimal_skew.txt
-python generate_numbers.py --n 100000000 --s 0.5 --output_file moderate_skew.txt
-python generate_numbers.py --n 100000000 --s 1 --output_file heavy_skew.txt
+python generate_numbers.py --n 50000000 --s 0 --output_file minimal_skew.txt
+python generate_numbers.py --n 50000000 --s 0.5 --output_file moderate_skew.txt
+python generate_numbers.py --n 50000000 --s 1 --output_file heavy_skew.txt
+python generate_numbers.py --n 50000000 --s 2 --output_file full_skew.txt
 '''
 
 
-def generate_zipf_sequence(n, s, output_file, max_value=1000000, plot=False):
+def generate_zipf_sequence(n, s, output_file, max_value=10000, plot=False):
     if s < 0:
         raise ValueError("s must be greater than or equal to 0")
     
