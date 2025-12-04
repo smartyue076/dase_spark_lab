@@ -150,8 +150,8 @@ Kmeans任务如下图所示，
 
 ### 实验结论
 
-1. **对于均匀数据，使用HashPartitioner的运行时间更短。**因为每个分区数据量基本一致，但RangePartitioner的采样过程较为耗时。
-2. **对于倾斜数据，使用RangePartitioner的运行时间更短。**因为RangePartitioner在采样时获取了数据分布，分区数据量较HashPartitioner更加均匀，分区的数据量最大值更小，如果一个分区分到了过多倾斜数据，则不会再给其分其他数据。但HashPartitioner分区时未考虑到数据分布，只是计算哈希值，可能导致一个分区分到过于多的数据，成为集群的瓶颈。而且对于大数据量任务时，RangePartitioner分区引入的采样时间远小于HashPartitioner带来的分区大小的巨大差别。
+1. **对于均匀数据，使用HashPartitioner的运行时间更短**。因为每个分区数据量基本一致，但RangePartitioner的采样过程较为耗时。
+2. **对于倾斜数据，使用RangePartitioner的运行时间更短**。因为RangePartitioner在采样时获取了数据分布，分区数据量较HashPartitioner更加均匀，分区的数据量最大值更小，如果一个分区分到了过多倾斜数据，则不会再给其分其他数据。但HashPartitioner分区时未考虑到数据分布，只是计算哈希值，可能导致一个分区分到过于多的数据，成为集群的瓶颈。而且对于大数据量任务时，RangePartitioner分区引入的采样时间远小于HashPartitioner带来的分区大小的巨大差别。
 
 ### 文件结构 
 src: 项目源代码
