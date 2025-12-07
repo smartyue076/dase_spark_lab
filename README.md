@@ -136,7 +136,7 @@ Kmeans任务如下图所示，
 
    原因：数据倾斜导致每个节点分到的任务量相差很大，容易引发单点性能瓶颈问题，使得总体的任务执行时间变长
 
-   <img src="img/runtime_through_skew.png" style="zoom:50%;" />
+   <img src="img/runtime_through_skew.png" style="zoom:35%;" />
 
 2. **不同分区器对均匀数据的执行时间**
 
@@ -148,13 +148,13 @@ Kmeans任务如下图所示，
 
    原因：对于均匀数据，三种分区器的分区结果相似。但RangePartitioner和CustomPartitioner有附加的采样过程
 
-   <img src="img/uniform_runtime.png" style="zoom:50%;" />
+   <img src="img/uniform_runtime.png" style="zoom:35%;" />
 
    另外，我们定义了**相对Shuffle数据量**来评估每个分区的任务量
 
    相对Shuffle数据量（极端情况） = max(每个节点的Shufflle read)/baseline（当前负载在当前分区器均匀数据下节点Shufflle read的中位数）
 
-   <img src="img/uniform_shuffle.png" style="zoom:50%;" />
+   <img src="img/uniform_shuffle.png" style="zoom:35%;" />
 
    结论2：对于排序任务，使用RangePartitioner分区时耗时最短，其次是CustomPartitioner和HashPartitioner原因：由于HashPartitioner只能确保局部有序，对于排序任务还需要进行一次全量Shuffle，因此其表现不及RangePartitioner和CustomPartitioner
 
@@ -172,9 +172,9 @@ Kmeans任务如下图所示，
 
    原因：RangePartitioner可以获取数据分布，因而不会将过多数据分入热点分区。但HashPartitioner只是计算哈希值，容易使单个分区分到过多数据而造成单点性能瓶颈
 
-   <img src="img/medium_runtime.png" style="zoom:50%;" />
+   <img src="img/medium_runtime.png" style="zoom:35%;" />
 
-   <img src="img/medium_shuffle.png" style="zoom:50%;" />
+   <img src="img/medium_shuffle.png" style="zoom:35%;" />
 
 4. **不同分区器对重度倾斜数据的执行时间**
 
@@ -186,9 +186,9 @@ Kmeans任务如下图所示，
    
    原因：Range和HashPartitioner对于相同key数据会放入统一分区，导致单点性能瓶颈。CustomPartitioner通过将热点数据切分并分配到不同分区来缓解这个问题
    
-   <img src="img/heavy_runtime.png" style="zoom:50%;" />
+   <img src="img/heavy_runtime.png" style="zoom:35%;" />
    
-   <img src="img/heavy_shuffle.png" style="zoom:50%;" />
+   <img src="img/heavy_shuffle.png" style="zoom:35%;" />
 
 ### 实验结论
 
