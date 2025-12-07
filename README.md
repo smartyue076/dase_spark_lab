@@ -126,43 +126,79 @@ Kmeans任务如下图所示，
 
 ### 实验结果与分析
 
-1. **不同负载和数据集下，使用三种分区器的相对运行时间：倾斜数据影响的直观表达**
+1. **数据分布对执行时间的影响**
+
+   不同负载和数据集下，使用三种分区器的相对运行时间：倾斜数据影响的直观表达
 
    指标：相对运行时间 = 运行时间/baseline（当前负载在当前分区器均匀数据下的运行时间）
 
-   现象：运行时间均匀 < 中度倾斜 < 重度倾斜
+   结论：数据分布倾斜度越高，任务执行时间越长
 
-2. **不同负载的倾斜情况（s=1，0.5）下每个节点的相对Shuffle数据量（极端情况）：明确倾斜数据影响的原因来源于出现了大工作量的节点**
+   原因：数据倾斜导致每个节点分到的任务量相差很大，容易引发单点性能瓶颈问题，使得总体的任务执行时间变长
 
-   指标：相对Shuffle数据量（极端情况） = max(每个节点的Shufflle read)/baseline（当前负载在当前分区器均匀数据下节点Shufflle read的中位数）
+   <img src="img/runtime_through_skew.png" style="zoom:50%;" />
+
+2. **不同分区器对均匀数据的执行时间**
+
+   不同负载的均匀情况（s=0）下，使用三种分区器的相对运行时间：判断在均匀情况下使用哪种分区器效率最高
+
+   指标：相对运行时间 = 运行时间/baseline（当前负载在HashPatitioner均匀数据下的运行时间）
+
+   结论1：对于均匀数据（s=0），使用HashPartitioner分区时耗时最短，其次是RangePartitioner和CustomPartitioner（除排序任务）
+
+   原因：对于均匀数据，三种分区器的分区结果相似。但RangePartitioner和CustomPartitioner有附加的采样过程
+
+   <img src="img/uniform_runtime.png" style="zoom:50%;" />
+
+   另外，我们定义了**相对Shuffle数据量**来评估每个分区的任务量
+
+   相对Shuffle数据量（极端情况） = max(每个节点的Shufflle read)/baseline（当前负载在当前分区器均匀数据下节点Shufflle read的中位数）
+
+   <img src="img/uniform_shuffle.png" style="zoom:50%;" />
+
+   结论2：对于排序任务，使用RangePartitioner分区时耗时最短，其次是CustomPartitioner和HashPartitioner原因：由于HashPartitioner只能确保局部有序，对于排序任务还需要进行一次全量Shuffle，因此其表现不及RangePartitioner和CustomPartitioner
 
    现象：在面对倾斜数据时，使用range分区器的不同分区数据量分布更均匀
 
    原因：hash分区器分区时未考虑key分布，只是计算hash函数。然而range分区器采样时可以获得整体的分布情况，而不会将过多数据分入同一分区
 
-3. **不同负载的均匀情况（s=0）下，使用三种分区器的相对运行时间：判断在均匀情况下使用哪种分区器效率最高**
+3. **不同分区器对中度倾斜数据的执行时间**
 
-   指标：相对运行时间 = 运行时间/baseline（当前负载在hash分区器均匀数据下的运行时间）
+   不同负载的中度倾斜情况（s=0.5）下每个节点的相对运行时间
 
-   现象：对于均匀数据，使用range分区的运行时间 > 使用hash分区的运行时间
+   指标：相对运行时间 = 运行时间/baseline（当前负载在HashPatitioner中度倾斜数据下的运行时间）
 
-   原因：对于均匀数据，hash和range分的区都很均匀，但range有一个采样stage耗时。
+   结论：对于中度倾斜数据（s=0.5），使用RangePartitioner分区耗时最短，其次是HashPartitioner和CustomPartitioner
+
+   原因：RangePartitioner可以获取数据分布，因而不会将过多数据分入热点分区。但HashPartitioner只是计算哈希值，容易使单个分区分到过多数据而造成单点性能瓶颈
+
+   <img src="img/medium_runtime.png" style="zoom:50%;" />
+
+   <img src="img/medium_shuffle.png" style="zoom:50%;" />
+
+4. **不同分区器对重度倾斜数据的执行时间**
+
+   不同负载的重度倾斜情况（s=1）下每个节点的相对运行时间
+
+   指标：相对运行时间 = 运行时间/baseline（当前负载在HashPatitioner重度倾斜数据下的运行时间）
+   
+   结论：对于重度倾斜数据（s=1），使用CustomPartitioner分区时耗时最短，其次是Range和HashPartitioner
+   
+   原因：Range和HashPartitioner对于相同key数据会放入统一分区，导致单点性能瓶颈。CustomPartitioner通过将热点数据切分并分配到不同分区来缓解这个问题
+   
+   <img src="img/heavy_runtime.png" style="zoom:50%;" />
+   
+   <img src="img/heavy_shuffle.png" style="zoom:50%;" />
 
 ### 实验结论
 
-1. **对于均匀数据，使用HashPartitioner的运行时间更短**。因为每个分区数据量基本一致，但RangePartitioner的采样过程较为耗时。
-2. **对于倾斜数据，使用RangePartitioner的运行时间更短**。因为RangePartitioner在采样时获取了数据分布，分区数据量较HashPartitioner更加均匀，分区的数据量最大值更小，如果一个分区分到了过多倾斜数据，则不会再给其分其他数据。但HashPartitioner分区时未考虑到数据分布，只是计算哈希值，可能导致一个分区分到过于多的数据，成为集群的瓶颈。而且对于大数据量任务时，RangePartitioner分区引入的采样时间远小于HashPartitioner带来的分区大小的巨大差别。
+1. 数据**分布均匀**时使用**HashPartitioner分区**，避免收益较低的采样流程耗时
+1. 数据**中度倾斜**时使用**RangePartitioner分区**，避免分到热点数据的节点承担其他热点和非热点任务
+1. 数据**重度倾斜**时使用**CustomPartitioner分区**，避免分到大规模热点数据的节点成为系统瓶颈
 
-### 文件结构 
-src: 项目源代码
+#### 小组分工
 
-env： 环境部署（docker）
-
-dataset： 负载数据集
-
-### 小组分工
-
-徐越：倾斜数据定义与实现，评估指标定义，集群环境部署，排序负载实现，演示视频制作
+徐越：倾斜数据定义与实现，评估指标定义，集群环境部署，排序负载实现，演示视频制作，PPT制作
 
 刘昊阳：Kmeans负载实现，调研不同数据量大小对结果的影响，PPT制作（实验结果展示与分析部分）
 
